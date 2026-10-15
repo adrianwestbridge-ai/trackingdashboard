@@ -134,10 +134,14 @@ export default function App() {
       return options;
     }
 
-    // Union of every known production site (always present) and any other
-    // origin that has actually sent data (covers a site not yet added to
+    // Union of every known production site (always present), any custom
+    // origin a super admin has ever granted to an admin (so a one-off URL
+    // typed in "Manage Admins" becomes a known site for every future admin,
+    // not just the one it was first added for), and any other origin that
+    // has actually sent data (covers a site not yet added to
     // KNOWN_PRODUCTION_SITES above).
-    const uniqueSites = Array.from(new Set([...KNOWN_PRODUCTION_SITES, ...Object.keys(counts)]));
+    const adminOrigins = admins.flatMap((a) => a.allowedOrigins || []);
+    const uniqueSites = Array.from(new Set([...KNOWN_PRODUCTION_SITES, ...adminOrigins, ...Object.keys(counts)]));
     return [
       { value: 'All', label: `All Websites (${uniqueSites.length} ${uniqueSites.length === 1 ? 'website' : 'websites'})` },
       ...uniqueSites.map((site) => ({
@@ -145,7 +149,7 @@ export default function App() {
         label: `${site} (${counts[site] || 0} ${counts[site] === 1 ? 'entry' : 'entries'})`,
       })),
     ];
-  }, [sessions, isSuperAdmin, currentUser]);
+  }, [sessions, isSuperAdmin, currentUser, admins]);
 
   // The data every tab actually renders - narrowed to the selected website.
   // Note: for a scoped admin, `sessions` itself already only ever contains
@@ -243,6 +247,15 @@ export default function App() {
       // Non-critical - the Create Admin modal just shows an empty list.
     }
   };
+
+  // Fetched as soon as a super admin logs in - not only when "Manage Admins"
+  // is opened - so a custom website URL ever granted to any admin shows up
+  // in the main website filter dropdown right away, not just inside that
+  // modal. Also refetched whenever the modal opens, to pick up anything
+  // changed since the last poll.
+  useEffect(() => {
+    if (authToken && isSuperAdmin) fetchAdmins();
+  }, [authToken, isSuperAdmin]);
 
   useEffect(() => {
     if (isCreateAdminOpen) fetchAdmins();
